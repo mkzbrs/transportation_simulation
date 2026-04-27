@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Transport Choice Simulation - STTHK2133</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: var(--primary); border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+        .card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-bottom: 20px; background: #fafafa; }
+        .input-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        input[type="number"] { width: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; transition: 0.3s; }
+        button:hover { background: #2980b9; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .progress-bar { font-weight: bold; color: var(--accent); margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Transport Choice Simulation</h1>
+    <p>A simulation tool to model transport mode selection based on <b>Discrete Choice Theory</b>.</p>
+
+    <div id="view-setup">
+        <div class="card">
+            <h3>Simulation Setup</h3>
+            <div class="input-row">
+                <label>Number of Respondents to Simulate:</label>
+                <input type="number" id="totalResp" value="1" min="1">
+            </div>
+            <button onclick="startSimulation()">Start Simulation</button>
+        </div>
+    </div>
+
+    <div id="view-survey" style="display:none;">
+        <div class="progress-bar" id="progress">Respondent 1 of 1</div>
+        <div class="card">
+            <h3 id="modeName">Self-Driving</h3>
+            <p>Rate the following factors (Likert 1-5):</p>
+            <div class="grid-inputs" id="inputContainer">
+                </div>
+            <button style="margin-top:20px;" onclick="nextSegment()">Next</button>
+        </div>
+    </div>
+
+    <div id="view-results" style="display:none;">
+        <div class="card">
+            <h3>Simulation Output</h3>
+            <canvas id="resultsChart"></canvas>
+            <button style="margin-top:20px; background:#95a5a6;" onclick="location.reload()">Reset Simulation</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const modes = ["Self-Driving", "Carpool", "E-hailing", "Public Transport"];
+    const factors = ["Experience", "Journey Quality", "Food Availability", "Cost Ease"];
+    const weights = { exp: 0.5, qual: 0.7, food: 0.2, cost: 1.2 };
+    
+    let respondents = 0, currentResp = 1, currentMode = 0;
+    let finalCounts = [0, 0, 0, 0], tempUtilities = [];
+
+    function startSimulation() {
+        respondents = parseInt(document.getElementById('totalResp').value);
+        document.getElementById('view-setup').style.display = 'none';
+        document.getElementById('view-survey').style.display = 'block';
+        renderInputs();
+    }
+
+    function renderInputs() {
+        document.getElementById('progress').innerText = `Respondent ${currentResp} of ${respondents}`;
+        document.getElementById('modeName').innerText = `Mode: ${modes[currentMode]}`;
+        const container = document.getElementById('inputContainer');
+        container.innerHTML = factors.map(f => `
+            <div>
+                <label>${f}</label><br>
+                <input type="number" class="likert" id="${f}" min="1" max="5" value="3">
+            </div>
+        `).join('');
+    }
+
+    function nextSegment() {
+        const vals = factors.map(f => parseInt(document.getElementById(f).value));
+        
+        // Deterministic Utility (V)
+        const V = (weights.exp * vals[0]) + (weights.qual * vals[1]) + (weights.food * vals[2]) + (weights.cost * vals[3]);
+        
+        // Stochastic Component (Epsilon) - Represents Random Disturbance (Rd)
+        const epsilon = (Math.random() - 0.5) * 0.3;
+        tempUtilities.push(V + epsilon);
+
+        currentMode++;
+        if (currentMode < 4) {
+            renderInputs();
+        } else {
+            // Find max utility for this individual decision-maker
+            const chosenIdx = tempUtilities.indexOf(Math.max(...tempUtilities));
+            finalCounts[chosenIdx]++;
+            
+            if (currentResp < respondents) {
+                currentResp++;
+                currentMode = 0;
+                tempUtilities = [];
+                renderInputs();
+            } else {
+                showResults();
+            }
+        }
+    }
+
+    function showResults() {
+        document.getElementById('view-survey').style.display = 'none';
+        document.getElementById('view-results').style.display = 'block';
+        const ctx = document.getElementById('resultsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: modes,
+                datasets: [{
+                    label: 'Number of Choices',
+                    data: finalCounts,
+                    backgroundColor: '#3498db',
+                    borderRadius: 5
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+    }
+</script>
+</body>
+</html>
